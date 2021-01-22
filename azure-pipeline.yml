@@ -1,0 +1,60 @@
+name: 0.0$(Rev:.r)
+
+variables:
+  System.Debug: true
+
+stages:
+- stage: Build
+  displayName: Build Stage
+  jobs:
+  - job: Build
+    displayName: Build Scripts
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+
+    # Install the necessary packages in order to compile the scripts
+    - task: Npm@1
+      displayName: Install NPM Module
+      inputs:
+        verbose: $(System.Debug)
+
+    # Perform a linting test on the typescript files
+    - task: Npm@1
+      displayName: Lint Typescript Files
+      inputs:
+        command: custom
+        customCommand: run lint
+        verbose: $(System.Debug)
+
+    # Compile (transpile) and package the module
+    - task: Npm@1
+      displayName: Compile Typescript Files
+      inputs:
+        command: custom
+        customCommand: run build
+        verbose: $(System.Debug)
+    
+    # Copy the package.json file into the working directory so it can be bundled up
+    - task: CopyFiles@2
+      inputs:
+        SourceFolder: '$(Build.SourcesDirectory)'
+        Contents: 'package.json'
+        TargetFolder: '$(Build.SourcesDirectory)/build/working'
+        OverWrite: true        
+
+    # Create an archive of the dist directory
+    - task: ArchiveFiles@2
+      inputs:
+        rootFolderOrFile: '$(Build.SourcesDirectory)/build/working'
+        includeRootFolder: false
+        archiveType: 'tar'
+        archiveFile: '$(Build.ArtifactStagingDirectory)/atd-$(Build.BuildNumber).tar.gz'
+        replaceExistingArchive: true
+
+    - task: PublishPipelineArtifact@1
+      displayName: Publish Artifacts
+      inputs:
+        targetPath: $(Build.ArtifactStagingDirectory)
+        artifact: 'build'
+
